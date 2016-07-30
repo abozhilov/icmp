@@ -66,6 +66,7 @@ class Ping:
         self.id = id(self) & 0xFFFF
         self.sequence = 0
         self.icmp_socket = None
+        self.stat = None
         self.timeout = timeout
         self.set_packet_size(packet_size)
         self.set_ttl(ttl)
