@@ -65,6 +65,7 @@ class Ping:
     def __init__(self, ttl = DEFAULT_TTL, packet_size = DEFAULT_PACKET_SIZE, timeout = DEFAULT_TIMEOUT):
         self.id = id(self) & 0xFFFF
         self.sequence = 0
+        self.icmp_socket = None
         self.timeout = timeout
         self.set_packet_size(packet_size)
         self.set_ttl(ttl)
@@ -166,10 +167,11 @@ class Ping:
         self.send_packet(packet, host)
         self.recv_packet()
         self.icmp_socket.close()
+        self.icmp_socket = None
         
         return self.stat
 
 if __name__ == '__main__':
-    p = Ping(packet_size = 64, timeout = 20, ttl = 11)
+    p = Ping(packet_size = 64, timeout = 2, ttl = 11)
     r = p.send('192.168.0.1')
     print(r.status, r.status_text, r.ip, r.ttl, r.rtt)
