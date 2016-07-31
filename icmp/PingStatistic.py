@@ -2,17 +2,19 @@ import time
 
 class PingStatistic:
     OK = 0
-    HOST_ERROR = 1
+    NAME_ERROR = 1
     PING_ERROR = 2
     TIMEOUT_ERROR = 3
     
-    def __init__(self):
+    def __init__(self, host):
         self.status = 0
         self.status_text = ''
+        self.host = host
         self.ip = ''
         self.ttl = 0
         self.start_time = 0
         self.end_time = 0
+        self.dns = 0
         self.rtt = 0
 
     def sent(self):
@@ -27,7 +29,10 @@ class PingStatistic:
         
     def set_ttl(self, ttl):
         self.ttl = ttl
-        
+    
+    def host_resolved(self, time):
+        self.dns = time
+    
     def end(self, status, message):
         self.status = status
         self.status_text = message

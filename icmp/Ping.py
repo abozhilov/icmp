@@ -1,4 +1,4 @@
-from PingStatistic import PingStatistic
+from icmp.PingStatistic import PingStatistic
 
 import socket
 import struct
@@ -19,7 +19,7 @@ class Ping:
     
     DEFAULT_TTL = 64
     DEFAULT_PACKET_SIZE = 64 # bytes
-    DEFAULT_TIMEOUT = 2 # secs
+    DEFAULT_TIMEOUT = 1 # sec
     
     ECHO_REPLY = 0
     DESTINATION_UNREACHABLE = 3
@@ -59,24 +59,19 @@ class Ping:
             'Bad length'
         ]
     }
-    UNKNOWN_HOST = 'Unknown host'
+    UNKNOWN_HOST = 'Unknown hostname'
     OPERATION_TIMEOUT = 'Operation timeout'
     
-    def __init__(self, ttl = DEFAULT_TTL, packet_size = DEFAULT_PACKET_SIZE, timeout = DEFAULT_TIMEOUT):
+    def __init__(self, packet_size = DEFAULT_PACKET_SIZE, timeout = DEFAULT_TIMEOUT):
         self.id = id(self) & 0xFFFF
         self.sequence = 0
-        self.icmp_socket = None
-        self.stat = None
         self.timeout = timeout
+        self.host_map = {}
         self.set_packet_size(packet_size)
-        self.set_ttl(ttl)
         
     def set_packet_size(self, packet_size):
         self.packet_size = min(max(packet_size, Ping.MIN_PACKET_SIZE), Ping.MAX_PACKET_SIZE)
         
-    def set_ttl(self, ttl):
-        self.ttl = min(max(ttl, Ping.MIN_TTL), Ping.MAX_TTL)
-    
     def checksum(self, buff):
         size = self.packet_size
         sum = 0
@@ -108,7 +103,7 @@ class Ping:
             0,
             self.id,
             self.sequence,
-            '1' * data_size
+            b'1' * data_size
         )
         struct.pack_into('!H', buff, 2, self.checksum(buff))
 
@@ -126,53 +121,61 @@ class Ping:
             
         return type, code, id, sequence
     
-    def send_packet(self, packet, host):
+    def send_packet(self, icmp_socket, host, packet, stat):
         while packet:
-            bytes_sent = self.icmp_socket.sendto(packet, (host, 1))
+            bytes_sent = icmp_socket.sendto(packet, (host, 1))
             packet = packet[bytes_sent:] 
             
-        self.stat.sent()
+        stat.sent()
             
-    def recv_packet(self):
+    def recv_packet(self, icmp_socket, sent_sequence, stat):
         timeout = self.timeout 
         while True:
             s_start = time.time()
-            ready = select.select([self.icmp_socket], [], [], timeout)
+            ready = select.select([icmp_socket], [], [], timeout)
             timeout -= time.time() - s_start
-            self.stat.received()
+            stat.received()
             
             if not len(ready[0]) or timeout < 0:
-                self.stat.end(PingStatistic.TIMEOUT_ERROR, Ping.OPERATION_TIMEOUT)
+                stat.end(PingStatistic.TIMEOUT_ERROR, Ping.OPERATION_TIMEOUT)
                 return
                 
-            data, addr = self.icmp_socket.recvfrom(Ping.RECEIVE_BUFF_SIZE)
+            data, addr = icmp_socket.recvfrom(Ping.RECEIVE_BUFF_SIZE)
             type, code, id, sequence = self.parse_packet(data[Ping.IP_HEADER_SIZE:])
 
-            if self.id == id and self.sequence == sequence:
-                self.stat.set_ip(addr[0])
-                self.stat.set_ttl(struct.unpack('b', data[Ping.IP_HEADER_SIZE + 9])[0])
+            if self.id == id and sent_sequence == sequence:
+                stat.set_ip(addr[0])
+                stat.set_ttl(struct.unpack('b', data[8:9])[0])
                 if type == Ping.ECHO_REPLY:
-                    self.stat.end(PingStatistic.OK, Ping.PING_MESSAGES[Ping.ECHO_REPLY][code])
+                    stat.end(PingStatistic.OK, Ping.PING_MESSAGES[Ping.ECHO_REPLY][code])
                 else:
-                    self.stat.end(PingStatistic.PING_ERROR, Ping.PING_MESSAGES[type][code])
+                    stat.end(PingStatistic.PING_ERROR, Ping.PING_MESSAGES[type][code])
                     
                 return 
 
     
-    def send(self, host):
-        self.stat = PingStatistic()
-        self.icmp_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, Ping.ICMP)
-        self.icmp_socket.setsockopt(socket.SOL_IP, socket.IP_TTL, self.ttl)
+    def send(self, host, ttl = DEFAULT_TTL):
+        stat = PingStatistic(host)
         packet = self.create_packet()
         
-        self.send_packet(packet, host)
-        self.recv_packet()
-        self.icmp_socket.close()
-        self.icmp_socket = None
+        if host in self.host_map:
+            ip = self.host_map[host]
+        else:
+            try:
+                resolve_start = time.time()
+                ip = socket.gethostbyname(host)
+                stat.host_resolved((time.time() - resolve_start) * 1000)
+                self.host_map[host] = ip
+            except socket.gaierror as err:
+                stat.end(PingStatistic.NAME_ERROR, Ping.UNKNOWN_HOST)
+                return stat
         
-        return self.stat
-
-if __name__ == '__main__':
-    p = Ping(packet_size = 64, timeout = 2, ttl = 11)
-    r = p.send('192.168.0.1')
-    print(r.status, r.status_text, r.ip, r.ttl, r.rtt)
+        icmp_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, Ping.ICMP)
+        try:
+            icmp_socket.setsockopt(socket.SOL_IP, socket.IP_TTL, min(max(ttl, Ping.MIN_TTL), Ping.MAX_TTL))
+            self.send_packet(icmp_socket, ip, packet, stat)
+            self.recv_packet(icmp_socket, self.sequence, stat)
+        finally:
+            icmp_socket.close()
+        
+        return stat
