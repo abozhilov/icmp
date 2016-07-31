@@ -1,6 +1,6 @@
 import icmp
 
-ping_res = icmp.ping('websitepulse.com') 
+ping_res = icmp.ping('google.com') 
 print('''Host        : {0}
 IP          : {1}
 Status      : {2}
