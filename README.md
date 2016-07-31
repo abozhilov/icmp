@@ -22,3 +22,13 @@ ResponseTime: {6:.2f} ms'''.format(
     )
 )
 ```
+
+```
+Host        : google.com
+IP          : 217.174.48.16
+Status      : 0
+StatusText  : OK
+TTL         : 62
+DNS         : 13.17 ms
+ResponseTime: 8.49 ms
+```
