@@ -1,14 +1,18 @@
 from icmp.Ping import Ping
-from icmp.PingStatistic import PingStatistic
+from icmp.PingStatus import PingStatus
+from icmp.PingSummary import PingSummary
 
 def ping(host, packet_size = Ping.DEFAULT_PACKET_SIZE, timeout = Ping.DEFAULT_TIMEOUT, ttl = Ping.DEFAULT_TTL):
-    p = Ping(packet_size, timeout)
-    return p.send(host, ttl)
+    my_ping = Ping(packet_size, timeout)
+    return my_ping.send(host, ttl)
 
-def traceroute(host):
-    p = Ping()
-    for i in range(1, 256):
-        res = p.send(host, i)
-        print(res.ip, res.rtt)
-        if res.status == PingStatistic.OK:
-            break
+def ping_test(host, count = 4, packet_size = Ping.DEFAULT_PACKET_SIZE, timeout = Ping.DEFAULT_TIMEOUT, ttl = Ping.DEFAULT_TTL):
+    my_ping = Ping(packet_size, timeout)
+    summary = PingSummary()
+    
+    for i in range(count):
+        summary.append(my_ping.send(host, ttl))
+    summary.end()
+    
+    return summary
+    

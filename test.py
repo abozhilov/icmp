@@ -17,3 +17,5 @@ ResponseTime: {6:.2f} ms'''.format(
         ping_res.rtt
     )
 )
+
+ping_summary = icmp.ping_test('google.com') 

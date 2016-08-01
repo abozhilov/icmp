@@ -1,3 +1,3 @@
-from icmp.PingStatistic import PingStatistic
+from icmp.PingStatus import PingStatus
 from icmp.Ping import Ping
 from icmp.utils import *

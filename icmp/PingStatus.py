@@ -1,6 +1,6 @@
 import time
 
-class PingStatistic:
+class PingStatus:
     OK = 0
     NAME_ERROR = 1
     PING_ERROR = 2
@@ -12,6 +12,7 @@ class PingStatistic:
         self.host = host
         self.ip = ''
         self.ttl = 0
+        self.sequence = 0
         self.start_time = 0
         self.end_time = 0
         self.dns = 0
@@ -29,6 +30,9 @@ class PingStatistic:
         
     def set_ttl(self, ttl):
         self.ttl = ttl
+        
+    def set_sequence(self, sequence):
+        self.sequence = sequence
     
     def host_resolved(self, time):
         self.dns = time
